@@ -104,7 +104,46 @@ void build_prompt(char *buffer, size_t size)
         snprintf(buffer, size, "myshell> ");
     }
 }
+int tokenize(char *input, char **args)
+{
+    int i = 0;
+    char *ptr = input;
 
+    while(*ptr && i < MAX_ARGS -1)
+    {
+        while(*ptr == ' ' || *ptr == '\t') ptr++;
+
+        if(*ptr == '\0') break;
+
+        if(*ptr == '"')
+        {
+            ptr ++;
+            args[i++] = ptr;
+
+            char *end = strchr(ptr, '"');
+            if(end)
+            {
+                *end = '\0';
+                ptr = end++;
+            } else {
+                break;
+            }
+        } else
+        {
+            args[i++] = ptr;
+
+            while(*ptr && *ptr != ' ' && *ptr != '\t') ptr++;
+
+            if(*ptr)
+            {
+                *ptr = '\0';
+                ptr++;
+            }
+        }
+    }
+    args[i] = NULL;
+    return i;
+}
 int main() 
 {
 
@@ -133,15 +172,13 @@ int main()
             add_history(input);
         }
 
-        int i = 0;
-        char *token = strtok(input, " ");
+        tokenize(input, args);
 
-        while(token != NULL && i < MAX_ARGS - 1)
+        if(args[0] == NULL)
         {
-            args[i++] = token;
-            token = strtok(NULL, " ");
+            free(input);
+            continue;
         }
-        args[i] = NULL;
 
         if(args[0] == NULL)
         {
