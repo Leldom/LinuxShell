@@ -9,9 +9,9 @@
 
 #define MAX_ARGS 64
 
-#define C_GREEN   "\001\033[1;32m\002"
-#define C_BLUE    "\001\033[1;34m\002"
-#define C_MAGENTA "\001\033[1;35m\002"
+#define C_GREEN   "\001\033[38;5;120m\002"
+#define C_BLUE    "\001\033[38;5;117m\002"
+#define C_MAGENTA "\001\033[38;5;212m\002"
 #define C_RESET   "\001\033[0m\002"
 
 void handle_signal(int sig)
@@ -55,13 +55,8 @@ void build_prompt(char *buffer, size_t size)
     char *user = getenv("USER");
 
     gethostname(hostName, sizeof(hostName));
-
     char *dot = strchr(hostName, '.');
-    if(dot)
-    {
-        *dot = '\0';
-    }
-
+    if(dot) *dot = '\0';
     if(!user) user = "user";
 
     if(getcwd(cwd, sizeof(cwd)) != NULL)
@@ -69,39 +64,25 @@ void build_prompt(char *buffer, size_t size)
         char* path_to_show = cwd;
 
         if (home && strncmp(cwd, home, strlen(home)) == 0)
-        {
             path_to_show = cwd + strlen(home); 
-        
-            if (get_git_branch(gitBranch, sizeof(gitBranch))) 
-            {
-                 snprintf(buffer, size, "%s%s@%s%s:%s~%s%s (%s%s%s) $ ", 
-                    C_GREEN, user, hostName, C_RESET,
-                    C_BLUE, path_to_show, C_RESET,
-                    C_MAGENTA, gitBranch, C_RESET);
-            } else 
-            {
-                snprintf(buffer, size, "%s%s@%s%s:%s~%s%s $ ", 
-                    C_GREEN, user, hostName, C_RESET,
-                    C_BLUE, path_to_show, C_RESET);
-            }
-        } else
+
+
+        if (get_git_branch(gitBranch, sizeof(gitBranch))) 
         {
-            if (get_git_branch(gitBranch, sizeof(gitBranch))) 
-            {
-                 snprintf(buffer, size, "%s%s@%s%s:%s%s%s (%s%s%s) $ ", 
-                    C_GREEN, user, hostName, C_RESET,
-                    C_BLUE, cwd, C_RESET,
-                    C_MAGENTA, gitBranch, C_RESET);
-            } else 
-            {
-                snprintf(buffer, size, "%s%s@%s%s:%s%s%s $ ", 
-                    C_GREEN, user, hostName, C_RESET,
-                    C_BLUE, cwd, C_RESET);
-            }
+                snprintf(buffer, size, "%s%s@%s%s %s%s%s (%s%s%s) » ", 
+                C_GREEN, user, hostName, C_RESET,
+                C_BLUE, path_to_show, C_RESET,
+                C_MAGENTA, gitBranch, C_RESET);
+        } else 
+        {
+            snprintf(buffer, size, "%s%s@%s%s %s%s%s » ", 
+                C_GREEN, user, hostName, C_RESET,
+                C_BLUE, path_to_show, C_RESET);
         }
+        
     }else
     {
-        snprintf(buffer, size, "myshell> ");
+        snprintf(buffer, size, "zenshell> ");
     }
 }
 int tokenize(char *input, char **args)
