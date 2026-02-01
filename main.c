@@ -1,108 +1,185 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
-#define MAX_LINE 1024
 #define MAX_ARGS 64
 
 #define C_GREEN "\033[1;32m"
 #define C_BLUE "\033[1;34m"
+#define C_MAGENTA "\033[1;35m"
 #define C_RESET "\033[0m"
 
-void handleSignal(int sig)
+void handle_signal(int sig)
 {
     (void)sig;
 
     write(STDOUT_FILENO, "\n", 1);
 
+    rl_on_new_line();
+    rl_replace_line("", 0);
+    rl_redisplay();
 }
 
-int main(int argc, char *argv[]) 
+int get_git_branch(char *branch_buffer, size_t size)
 {
+    FILE *fp = popen("git branch --show-current 2> /dev/null", "r");
 
-    signal(SIGINT, handleSignal);
+    if(fp == NULL)
+    {
+        return 0;
+    }
 
-    char line[MAX_LINE];
+    if(fgets(branch_buffer, size, fp) != NULL)
+    {
+        branch_buffer[strcspn(branch_buffer, "\n")] = 0;
+
+        pclose(fp);
+        return(strlen(branch_buffer) > 0);
+    }
+    pclose(fp);
+    return(strlen(branch_buffer) > 0);
+}
+
+void build_prompt(char *buffer, size_t size)
+{
     char hostName[256];
     char cwd[1024];
-    char* args[MAX_ARGS];
-    char* home = getenv("HOME");
+    char gitBranch[64] = {0};
+
+    char *home = getenv("HOME");
+    char *user = getenv("USER");
 
     gethostname(hostName, sizeof(hostName));
+
+    char *dot = strchr(hostName, '.');
+    if(dot)
+    {
+        *dot = '\0';
+    }
+
+    if(!user) user = "user";
+
+    if(getcwd(cwd, sizeof(cwd)) != NULL)
+    {
+        char* path_to_show = cwd;
+
+        if (home && strncmp(cwd, home, strlen(home)) == 0)
+        {
+            path_to_show = cwd + strlen(home); 
+        
+            if (get_git_branch(gitBranch, sizeof(gitBranch))) 
+            {
+                 snprintf(buffer, size, "%s%s@%s%s:%s~%s%s (%s%s%s) $ ", 
+                    C_GREEN, user, hostName, C_RESET,
+                    C_BLUE, path_to_show, C_RESET,
+                    C_MAGENTA, gitBranch, C_RESET);
+            } else 
+            {
+                snprintf(buffer, size, "%s%s@%s%s:%s~%s%s $ ", 
+                    C_GREEN, user, hostName, C_RESET,
+                    C_BLUE, path_to_show, C_RESET);
+            }
+        } else
+        {
+            if (get_git_branch(gitBranch, sizeof(gitBranch))) 
+            {
+                 snprintf(buffer, size, "%s%s@%s%s:%s%s%s (%s%s%s) $ ", 
+                    C_GREEN, user, hostName, C_RESET,
+                    C_BLUE, cwd, C_RESET,
+                    C_MAGENTA, gitBranch, C_RESET);
+            } else 
+            {
+                snprintf(buffer, size, "%s%s@%s%s:%s%s%s $ ", 
+                    C_GREEN, user, hostName, C_RESET,
+                    C_BLUE, cwd, C_RESET);
+            }
+        }
+    }else
+    {
+        snprintf(buffer, size, "myshell> ");
+    }
+}
+
+int main() 
+{
+
+    signal(SIGINT, handle_signal);
+
+    char *input;
+    char prompt[2048];
+    char *args[MAX_ARGS];
+
 
     while (1) 
     {
 
-        if (getcwd(cwd, sizeof(cwd)) != NULL) {
-            printf("%s%s%s", C_GREEN, hostName, C_RESET);
-            printf(":");
-            
-            if (home && strncmp(cwd, home, strlen(home)) == 0) {
-                printf("%s~%s%s", C_BLUE, cwd + strlen(home), C_RESET);
-            } else {
-                printf("%s%s%s", C_BLUE, cwd, C_RESET);
-            }
-        }
-        printf(" $ ");
+        build_prompt(prompt, sizeof(prompt));
 
-        if (!fgets(line, MAX_LINE, stdin)) 
+        input = readline(prompt);
+
+        if(!input)
         {
-
-            if(feof(stdin))
-            {
-                printf("\nLogout.\n");
-                break;
-            }
-
-            clearerr(stdin);
-            continue;
+            printf("\nLogout\n");
+            break;
         }
 
-        line[strcspn(line, "\n")] = 0;
-
-        if (strlen(line) == 0) continue;
+        if(strlen(input) > 0)
+        {
+            add_history(input);
+        }
 
         int i = 0;
-        char* token = strtok(line, " ");
+        char *token = strtok(input, " ");
 
-        while (token != NULL && i < MAX_ARGS - 1) 
+        while(token != NULL && i < MAX_ARGS - 1)
         {
             args[i++] = token;
             token = strtok(NULL, " ");
         }
-        args[i] = NULL; // For execvp
+        args[i] = NULL;
 
-        if (strcmp(args[0], "exit") == 0) break; // Exit the shell
-
-        if (strcmp(args[0], "cd") == 0) 
+        if(args[0] == NULL)
         {
-            char* target = args[1];
-            if (!target) target = home;
+            free(input);
+            continue;
+        }
 
-            if (chdir(target) != 0) 
+        if(strcmp(args[0], "exit") == 0)
+        {
+            free(input);
+            break;
+        }
+
+        if(strcmp(args[0], "cd") == 0)
+        {
+            char *target = args[1] ? args[1] : getenv("HOME");
+            if(chdir(target) != 0)
             {
                 perror("cd error");
             }
+            free(input);
             continue;
-
         }
+
         const pid_t pid = fork();
-        if (pid < 0) 
+        if(pid < 0)
         {
             perror("fork error");
-
-        } else if (pid == 0) 
+        } else if(pid == 0)
         {
             execvp(args[0], args);
             perror("command not found");
-            return 1; // kill child
-
-        } else 
+            exit(1);
+        } else
         {
-            wait(NULL); // Wait for child process to finish
+            wait(NULL);
         }
+        free(input);
     }
     return 0;
 }
