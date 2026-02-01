@@ -61,23 +61,37 @@ void build_prompt(char *buffer, size_t size)
 
     if(getcwd(cwd, sizeof(cwd)) != NULL)
     {
-        char* path_to_show = cwd;
-
         if (home && strncmp(cwd, home, strlen(home)) == 0)
-            path_to_show = cwd + strlen(home); 
-
-
-        if (get_git_branch(gitBranch, sizeof(gitBranch))) 
         {
+            char* path_rest = cwd + strlen(home); 
+
+            if (get_git_branch(gitBranch, sizeof(gitBranch))) 
+            {
+                snprintf(buffer, size, "%s%s@%s%s %s~%s%s (%s%s%s) » ", 
+                C_GREEN, user, hostName, C_RESET,
+                C_BLUE, path_rest, C_RESET,
+                C_MAGENTA, gitBranch, C_RESET);
+            } else 
+            {
+                snprintf(buffer, size, "%s%s@%s%s %s~%s%s » ", 
+                C_GREEN, user, hostName, C_RESET,
+                C_BLUE, path_rest, C_RESET);
+            }
+        }
+        else 
+        {
+            if (get_git_branch(gitBranch, sizeof(gitBranch))) 
+            {
                 snprintf(buffer, size, "%s%s@%s%s %s%s%s (%s%s%s) » ", 
                 C_GREEN, user, hostName, C_RESET,
-                C_BLUE, path_to_show, C_RESET,
+                C_BLUE, cwd, C_RESET,
                 C_MAGENTA, gitBranch, C_RESET);
-        } else 
-        {
-            snprintf(buffer, size, "%s%s@%s%s %s%s%s » ", 
+            } else 
+            {
+                snprintf(buffer, size, "%s%s@%s%s %s%s%s » ", 
                 C_GREEN, user, hostName, C_RESET,
-                C_BLUE, path_to_show, C_RESET);
+                C_BLUE, cwd, C_RESET);
+            }
         }
         
     }else
@@ -85,6 +99,7 @@ void build_prompt(char *buffer, size_t size)
         snprintf(buffer, size, "zenshell> ");
     }
 }
+
 int tokenize(char *input, char **args)
 {
     int i = 0;
@@ -98,7 +113,7 @@ int tokenize(char *input, char **args)
 
         if(*ptr == '"')
         {
-            ptr ++;
+            ptr++;
             args[i++] = ptr;
 
             char *end = strchr(ptr, '"');
@@ -125,6 +140,7 @@ int tokenize(char *input, char **args)
     args[i] = NULL;
     return i;
 }
+
 int main() 
 {
 
