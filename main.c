@@ -3,8 +3,13 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <signal.h>
+
 #define MAX_LINE 1024
 #define MAX_ARGS 64
+
+#define C_GREEN "\033[1;32m"
+#define C_BLUE "\033[1;34m"
+#define C_RESET "\033[0m"
 
 void handleSignal(int sig)
 {
@@ -12,7 +17,6 @@ void handleSignal(int sig)
 
     write(STDOUT_FILENO, "\n", 1);
 
-    write(STDOUT_FILENO, "@MyShell~> ", 11);
 }
 
 int main(int argc, char *argv[]) 
@@ -22,14 +26,26 @@ int main(int argc, char *argv[])
 
     char line[MAX_LINE];
     char hostName[256];
+    char cwd[1024];
     char* args[MAX_ARGS];
+    char* home = getenv("HOME");
 
     gethostname(hostName, sizeof(hostName));
 
     while (1) 
     {
 
-        printf("\033[0;32m%s\033[0m @MyShell~> ", hostName);
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            printf("%s%s%s", C_GREEN, hostName, C_RESET);
+            printf(":");
+            
+            if (home && strncmp(cwd, home, strlen(home)) == 0) {
+                printf("%s~%s%s", C_BLUE, cwd + strlen(home), C_RESET);
+            } else {
+                printf("%s%s%s", C_BLUE, cwd, C_RESET);
+            }
+        }
+        printf(" $ ");
 
         if (!fgets(line, MAX_LINE, stdin)) 
         {
@@ -62,17 +78,15 @@ int main(int argc, char *argv[])
 
         if (strcmp(args[0], "cd") == 0) 
         {
-            if (args[1] == NULL) 
+            char* target = args[1];
+            if (!target) target = home;
+
+            if (chdir(target) != 0) 
             {
-                fprintf(stderr, "cd: missing argument\n");
-            } else 
-            {
-                if (chdir(args[1]) != 0) 
-                {
-                    perror("cd error");
-                }
+                perror("cd error");
             }
             continue;
+
         }
         const pid_t pid = fork();
         if (pid < 0) 
@@ -83,8 +97,8 @@ int main(int argc, char *argv[])
         {
             execvp(args[0], args);
             perror("command not found");
-            return 1;
-            
+            return 1; // kill child
+
         } else 
         {
             wait(NULL); // Wait for child process to finish
