@@ -9,10 +9,10 @@
 
 #define MAX_ARGS 64
 
-#define C_GREEN "\033[1;32m"
-#define C_BLUE "\033[1;34m"
-#define C_MAGENTA "\033[1;35m"
-#define C_RESET "\033[0m"
+#define C_GREEN   "\001\033[1;32m\002"
+#define C_BLUE    "\001\033[1;34m\002"
+#define C_MAGENTA "\001\033[1;35m\002"
+#define C_RESET   "\001\033[0m\002"
 
 void handle_signal(int sig)
 {
